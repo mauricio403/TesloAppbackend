@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -20,8 +20,8 @@ export class ProductsService {
 
 
   async create(createProductDto: CreateProductDto) {
-
     try {
+
       //creacion de registro o instancia
       const product = this.productRepository.create(createProductDto);
 
@@ -37,20 +37,32 @@ export class ProductsService {
 
   }
 
-  findAll() {
-    return `This action returns all products`;
+  async findAll() {
+
+    const products = await this.productRepository.find();
+    return products
+
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} product`;
+  async findOne(id: string) {
+
+    const product = await this.productRepository.findOneBy({ id })
+
+    if (!product) throw new NotFoundException(`Product with ${id} not found`);
+
+    return product
+
   }
+
+
 
   update(id: number, updateProductDto: UpdateProductDto) {
     return `This action updates a #${id} product`;
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} product`;
+ async remove(id: string) {
+   const product = await this.findOne(id);
+   await this.productRepository.remove(product)
   }
 
   private handleDBExpeptions(error: any) {
