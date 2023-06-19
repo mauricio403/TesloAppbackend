@@ -42,7 +42,7 @@ export class ProductsService {
   }
 
   async findAll(paginationDTO: PaginationDTO) {
-    const {limit = 10, offset = 0} = paginationDTO
+    const { limit = 10, offset = 0 } = paginationDTO
     const products = await this.productRepository.find({
       take: limit,
       skip: offset
@@ -55,14 +55,14 @@ export class ProductsService {
 
     let product: Product;
 
-    if(isUUID(term)) {
-      product = await this.productRepository.findOneBy({id: term})
+    if (isUUID(term)) {
+      product = await this.productRepository.findOneBy({ id: term })
     } else {
       const queryBuilder = this.productRepository.createQueryBuilder();
       product = await queryBuilder
         .where('UPPER(title) =:title or slug =:slug', {
-          title: term.toUpperCase() ,
-          slug : term.toLowerCase(),
+          title: term.toUpperCase(),
+          slug: term.toLowerCase(),
         }).getOne();
     }
 
@@ -74,13 +74,27 @@ export class ProductsService {
 
 
 
-  update(id: number, updateProductDto: UpdateProductDto) {
-    return `This action updates a #${id} product`;
+  async update(id: string, updateProductDto: UpdateProductDto) {
+
+    const product = await this.productRepository.preload({
+      id: id,
+      ...updateProductDto
+    });
+
+    if (!product) throw new NotFoundException(`Product with id : ${id} not found`);
+
+    try {
+      await this.productRepository.save(product);
+      return product
+
+    } catch (error) {
+      this.handleDBExpeptions(error)
+    }
   }
 
- async remove(id: string) {
-   const product = await this.findOne(id);
-   await this.productRepository.remove(product)
+  async remove(id: string) {
+    const product = await this.findOne(id);
+    await this.productRepository.remove(product)
   }
 
   private handleDBExpeptions(error: any) {
