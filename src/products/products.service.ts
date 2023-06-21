@@ -6,6 +6,7 @@ import { Repository } from 'typeorm';
 import { Product } from './entities/product.entity';
 import { PaginationDTO } from 'src/common/dtos/pagination.dto';
 import { validate as isUUID } from "uuid";
+import { ProductImage } from './entities/product-image.entity';
 
 
 
@@ -20,18 +21,24 @@ export class ProductsService {
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
 
+    @InjectRepository(ProductImage)
+    private readonly productImageRepository: Repository<ProductImage>,
+
   ) { }
 
 
   async create(createProductDto: CreateProductDto) {
     try {
-
+      const {images = [], ...productDetails} = createProductDto;
       //creacion de registro o instancia
-      const product = this.productRepository.create(createProductDto);
+      const product = this.productRepository.create({
+        ...productDetails,
+        images: images.map (image => this.productImageRepository.create({url:image}))
+      });
 
       //impacto en BD
       await this.productRepository.save(product);
-      return product;
+      return {...product, images};
 
 
     } catch (error) {
@@ -45,9 +52,15 @@ export class ProductsService {
     const { limit = 10, offset = 0 } = paginationDTO
     const products = await this.productRepository.find({
       take: limit,
-      skip: offset
+      skip: offset,
+      relations: {
+        images: true
+      }
     });
-    return products
+    return products.map(product => ({
+      ...product,
+      images: product.images.map(img => img.url)
+    }))
 
   }
 
@@ -58,12 +71,14 @@ export class ProductsService {
     if (isUUID(term)) {
       product = await this.productRepository.findOneBy({ id: term })
     } else {
-      const queryBuilder = this.productRepository.createQueryBuilder();
+      const queryBuilder = this.productRepository.createQueryBuilder('prod');
       product = await queryBuilder
         .where('UPPER(title) =:title or slug =:slug', {
           title: term.toUpperCase(),
           slug: term.toLowerCase(),
-        }).getOne();
+        })
+        .leftJoinAndSelect('prod.images', 'prodImages') //relaciones para query builder
+        .getOne();
     }
 
     if (!product) throw new NotFoundException(`Product with ${term} not found`);
@@ -78,7 +93,8 @@ export class ProductsService {
 
     const product = await this.productRepository.preload({
       id: id,
-      ...updateProductDto
+      ...updateProductDto,
+      images: []
     });
 
     if (!product) throw new NotFoundException(`Product with id : ${id} not found`);
