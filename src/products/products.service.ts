@@ -7,6 +7,7 @@ import { Product } from './entities/product.entity';
 import { PaginationDTO } from 'src/common/dtos/pagination.dto';
 import { validate as isUUID } from "uuid";
 import { ProductImage } from './entities/product-image.entity';
+import { User } from 'src/auth/entities/user.entity';
 
 
 
@@ -29,18 +30,19 @@ export class ProductsService {
   ) { }
 
 
-  async create(createProductDto: CreateProductDto) {
+  async create(createProductDto: CreateProductDto, user: User) {
     try {
-      const {images = [], ...productDetails} = createProductDto;
+      const { images = [], ...productDetails } = createProductDto;
       //creacion de registro o instancia
       const product = this.productRepository.create({
         ...productDetails,
-        images: images.map (image => this.productImageRepository.create({url:image}))
+        images: images.map(image => this.productImageRepository.create({ url: image })),
+        user
       });
 
       //impacto en BD
       await this.productRepository.save(product);
-      return {...product, images};
+      return { ...product, images };
 
 
     } catch (error) {
@@ -91,11 +93,11 @@ export class ProductsService {
 
 
 
-  async update(id: string, updateProductDto: UpdateProductDto) {
+  async update(id: string, updateProductDto: UpdateProductDto,  user: User) {
 
-    const {images, ...toUpdate} = updateProductDto;
-    
-    
+    const { images, ...toUpdate } = updateProductDto;
+
+
     const product = await this.productRepository.preload({ id, ...toUpdate });
 
     if (!product) throw new NotFoundException(`Product with id : ${id} not found`);
@@ -107,12 +109,13 @@ export class ProductsService {
 
     try {
 
-      if(images) {
-        await queryRunner.manager.delete(ProductImage, {product : {id}} )
-        product.images = images.map(image => this.productImageRepository.create({url: image}))
+      if (images) {
+        await queryRunner.manager.delete(ProductImage, { product: { id } })
+        product.images = images.map(image => this.productImageRepository.create({ url: image }))
       } else {
 
       }
+      product.user = user
       await queryRunner.manager.save(product);
 
       await queryRunner.commitTransaction();
@@ -145,13 +148,13 @@ export class ProductsService {
     const query = this.productRepository.createQueryBuilder('product');
     try {
       return await query
-      .delete()
-      .where({})
-      .execute();
+        .delete()
+        .where({})
+        .execute();
 
-      
+
     } catch (error) {
-        this.handleDBExpeptions(error)
+      this.handleDBExpeptions(error)
     }
   }
 
